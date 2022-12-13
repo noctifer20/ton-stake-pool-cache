@@ -1,0 +1,17 @@
+version: '3.8'
+volumes:
+  pg:
+    name: ${COMPOSE_PROJECT_NAME:?}-pg
+services:
+  pg:
+    image: postgres:${COMPOSE_PG_VERSION:-14}-alpine
+#    networks:
+#      - lan
+    ports:
+      - '${PG_HOST:?}:${PG_PORT:?}:5432'
+    environment:
+      POSTGRES_USER: ${PG_USERNAME:?}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?}
+      POSTGRES_DB: ${PG_DATABASE:?}
+    volumes:
+      - pg:/var/lib/postgresql/data

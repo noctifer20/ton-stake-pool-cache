@@ -1,13 +1,17 @@
-import { Controller, Get } from '@nestjs/common';
-
+import { Controller, Get, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 
-@Controller()
+@Controller('wallet')
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  getData() {
-    return this.appService.getData();
+  async getWallet(@Query('address') address) {
+    const wallet = await this.appService.getWallet(address);
+
+    return {
+      totalBalance: wallet.balance.toString(),
+      totalEarnings: wallet.profit.toString(),
+    };
   }
 }
