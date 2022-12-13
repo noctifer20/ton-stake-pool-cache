@@ -38,6 +38,7 @@ export class PoolStateCacheService implements OnModuleInit {
         let fromTs = Date.now() - 30 * 24 * 60 * 60 * 1000;
         fromTs = Math.floor(fromTs / 1000);
 
+        // Either a month ago or continue from last fetch
         if (poolCacheInfo)
           fromTs = Math.min(
             poolCacheInfo.lastCachedTimestamp + 60 * 60 * 36,
@@ -50,6 +51,7 @@ export class PoolStateCacheService implements OnModuleInit {
         for (let ts = fromTs; ts < tillTs; ts += 60 * 60 * 36) {
           keyTimePoints.push(ts);
         }
+
         return keyTimePoints.reduce(
           (prevPromise, ts) =>
             prevPromise.then(() => this.cacheByTimestamp(ts)),
@@ -65,51 +67,10 @@ export class PoolStateCacheService implements OnModuleInit {
     }, 1000 * 60 * 60 * 36);
   }
 
-  processMember(
-    key: string,
-    member: {
-      balance: BN;
-      pendingDeposit: BN;
-      pendingWithdrawal: BN;
-    },
-    pool: Address,
-    cache: Map<string, PoolMemberState>
-  ) {
-    const address = bnToAddress(0, new BN(key)).toFriendly();
+  async cacheByTimestamp(ts: number) {
+    this.logger.debug(`processing election: ${ts}`);
 
-    const cachedMember = cache.get(address);
-
-    if (!cachedMember) {
-      cache.set(
-        address,
-        this.addressStateRepo.create({
-          address,
-          pool: pool.toFriendly(),
-          profit: new BN(0),
-          balance: member.balance,
-          pendingDeposit: member.pendingDeposit,
-          pendingWithdrawal: member.pendingWithdrawal,
-        })
-      );
-
-      return;
-    }
-
-    const balanceWithoutProfit = cachedMember.balance
-      .sub(cachedMember.pendingWithdrawal)
-      .add(cachedMember.pendingDeposit);
-
-    const profit = cachedMember.profit.add(
-      member.balance.sub(balanceWithoutProfit)
-    );
-
-    cache.set(address, {
-      ...cachedMember,
-      profit,
-      balance: member.balance,
-      pendingDeposit: member.pendingDeposit,
-      pendingWithdrawal: member.pendingWithdrawal,
-    });
+    await this.processPool(ts, this.knownPool);
   }
 
   async processPool(timestamp: number, pool: Address) {
@@ -161,9 +122,50 @@ export class PoolStateCacheService implements OnModuleInit {
     });
   }
 
-  async cacheByTimestamp(ts: number) {
-    this.logger.debug(`processing election: ${ts}`);
+  processMember(
+    key: string,
+    member: {
+      balance: BN;
+      pendingDeposit: BN;
+      pendingWithdrawal: BN;
+    },
+    pool: Address,
+    cache: Map<string, PoolMemberState>
+  ) {
+    const address = bnToAddress(0, new BN(key)).toFriendly();
 
-    await this.processPool(ts, this.knownPool);
+    const cachedMember = cache.get(address);
+
+    if (!cachedMember) {
+      cache.set(
+        address,
+        this.addressStateRepo.create({
+          address,
+          pool: pool.toFriendly(),
+          profit: new BN(0),
+          balance: member.balance,
+          pendingDeposit: member.pendingDeposit,
+          pendingWithdrawal: member.pendingWithdrawal,
+        })
+      );
+
+      return;
+    }
+
+    const balanceWithoutProfit = cachedMember.balance
+      .sub(cachedMember.pendingWithdrawal)
+      .add(cachedMember.pendingDeposit);
+
+    const profit = cachedMember.profit.add(
+      member.balance.sub(balanceWithoutProfit)
+    );
+
+    cache.set(address, {
+      ...cachedMember,
+      profit,
+      balance: member.balance,
+      pendingDeposit: member.pendingDeposit,
+      pendingWithdrawal: member.pendingWithdrawal,
+    });
   }
 }
